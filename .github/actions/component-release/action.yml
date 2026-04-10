@@ -1,0 +1,23 @@
+name: 'Component Release Manager'
+description: 'Manages semantic versioning, changelog generation, and tags.'
+inputs:
+  pr_title:
+    description: 'Title of the merged PR'
+    required: true
+  github_token:
+    description: 'GITHUB_TOKEN for pushing and releasing'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Run Release Script
+      env:
+        PR_TITLE: ${{ inputs.pr_title }}
+        GH_TOKEN: ${{ inputs.github_token }}
+      run: python ${{ github.action_path }}/action_release.py
+      shell: bash
