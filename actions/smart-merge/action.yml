@@ -1,0 +1,24 @@
+name: Smart Merge
+description: Performs smart merge for two branches with specifically configured merge driver
+
+inputs:
+  master-remote:
+    description: URL or remote name for the upstream branch source.
+    required: true
+  master-branch:
+    description: Upstream branch to merge from.
+    required: true
+  fork-branch:
+    description: Target fork branch to merge into.
+    required: true
+  merge-mapping-file:
+    description: Path to the merge strategy mapping file.
+    required: true
+
+outputs:
+  merge-driver:
+    description: Configured merge driver name.
+
+runs:
+  using: node20
+  main: dist/index.js

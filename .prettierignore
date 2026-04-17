@@ -1,0 +1,5 @@
+node_modules/
+actions/*/node_modules/
+actions/*/dist/
+actions/*/__tests__/_temp/
+actions/*/src/generated/
