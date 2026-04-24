@@ -1,0 +1,8 @@
+node_modules/
+dist/
+actions/*/dist/
+actions/*/node_modules/
+actions/*/__tests__/_temp/
+.DS_Store
+*.xar
+actions/*/audit.json
