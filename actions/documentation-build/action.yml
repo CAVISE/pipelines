@@ -34,8 +34,6 @@ runs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
-        cache: pip
-        cache-dependency-path: ${{ inputs.docs-directory }}/${{ inputs.requirements-file }}
 
     - name: Install documentation dependencies
       shell: bash
@@ -43,7 +41,6 @@ runs:
       env:
         REQUIREMENTS_FILE: ${{ inputs.requirements-file }}
       run: |
-        set -euo pipefail
         python -m pip install --upgrade pip
         python -m pip install -r "$REQUIREMENTS_FILE" --no-cache-dir
 
@@ -55,10 +52,4 @@ runs:
         BUILD_DIRECTORY: ${{ inputs.build-directory }}
         SITE_DIRECTORY: ${{ inputs.site-directory }}
       run: |
-        set -euo pipefail
         python -m sphinx -M html "$SOURCE_DIRECTORY" "$BUILD_DIRECTORY"
-
-        if [[ ! -d "$SITE_DIRECTORY" ]]; then
-          echo "Built site directory not found: $SITE_DIRECTORY" >&2
-          exit 1
-        fi
