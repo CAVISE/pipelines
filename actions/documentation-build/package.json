@@ -1,0 +1,14 @@
+{
+  "name": "@actions/documentation-build",
+  "private": true,
+  "description": "Composite action that builds Documentation for GitHub Pages",
+  "scripts": {
+    "audit-moderate": "npm audit --audit-level=moderate",
+    "build": "printf 'documentation-build is a composite action; no build step required\\n'",
+    "check": "printf 'documentation-build is a composite action; no typecheck step required\\n'",
+    "tsc": "printf 'documentation-build is a composite action; no typecheck step required\\n'"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
