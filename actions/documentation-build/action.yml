@@ -22,10 +22,6 @@ inputs:
     description: Path to the Sphinx build directory relative to docs-directory.
     required: false
     default: "build"
-  site-directory:
-    description: Path to the generated HTML site relative to docs-directory.
-    required: false
-    default: "build/html"
 
 runs:
   using: composite
@@ -50,6 +46,5 @@ runs:
       env:
         SOURCE_DIRECTORY: ${{ inputs.source-directory }}
         BUILD_DIRECTORY: ${{ inputs.build-directory }}
-        SITE_DIRECTORY: ${{ inputs.site-directory }}
       run: |
         python -m sphinx -M html "$SOURCE_DIRECTORY" "$BUILD_DIRECTORY"
