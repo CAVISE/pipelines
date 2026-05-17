@@ -1,6 +1,6 @@
 name: Python Pre-Commit
 
-"on":
+on:
   workflow_call:
     inputs:
       runs-on:

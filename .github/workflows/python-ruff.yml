@@ -1,6 +1,6 @@
 name: Python Ruff
 
-"on":
+on:
   workflow_call:
     inputs:
       runs-on:
@@ -29,7 +29,7 @@ jobs:
       - name: Run ruff check
         uses: astral-sh/ruff-action@v3
         with:
-          args: "check"
+          args: check
 
   format-check:
     if: inputs.run-format-check
@@ -43,4 +43,4 @@ jobs:
       - name: Run ruff format check with diff
         uses: astral-sh/ruff-action@v3
         with:
-          args: "format --check --diff"
+          args: format --check --diff

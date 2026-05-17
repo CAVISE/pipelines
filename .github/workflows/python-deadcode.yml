@@ -1,6 +1,6 @@
 name: Python Deadcode
 
-"on":
+on:
   workflow_call:
     inputs:
       runs-on:

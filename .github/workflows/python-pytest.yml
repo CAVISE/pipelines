@@ -1,6 +1,6 @@
 name: Python Pytest
 
-"on":
+on:
   workflow_call:
     inputs:
       runs-on:
