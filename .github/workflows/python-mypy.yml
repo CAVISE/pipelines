@@ -55,34 +55,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Setup Python
+        uses: CAVISE/pipelines/actions/setup-python-pip@ci/opencda-workflow
         with:
           python-version: ${{ inputs.python-version }}
 
       - name: Install dependencies
         shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install mypy mypy-protobuf grpcio-tools
+        run: python -m pip install mypy mypy-protobuf grpcio-tools
 
       - name: Generate protobuf modules
         if: inputs.protobuf-generate
-        shell: bash
-        env:
-          PROTOBUF_MESSAGES: ${{ inputs.protobuf-messages }}
-          PROTOBUF_MYPY_OUT: ${{ inputs.protobuf-mypy-out }}
-          PROTOBUF_OUTPUT_DIR: ${{ inputs.protobuf-output-dir }}
-          PROTOBUF_SOURCE_DIR: ${{ inputs.protobuf-source-dir }}
-        run: |
-          mkdir -p "$PROTOBUF_OUTPUT_DIR"
-          proto_files=$(python -c 'import json, os, pathlib; source = pathlib.Path(os.environ["PROTOBUF_SOURCE_DIR"]); print(" ".join(str(source / f"{name}.proto") for name in json.loads(os.environ["PROTOBUF_MESSAGES"])))')
-          args=("-I" "$PROTOBUF_SOURCE_DIR" "--python_out=$PROTOBUF_OUTPUT_DIR")
-          if [[ "$PROTOBUF_MYPY_OUT" == "true" ]]; then
-            args+=("--mypy_out=$PROTOBUF_OUTPUT_DIR")
-          fi
-
-          python -m grpc_tools.protoc "${args[@]}" $proto_files
+        uses: CAVISE/pipelines/actions/generate-protobufs@ci/opencda-workflow
+        with:
+          generator: grpc-tools
+          source-dir: ${{ inputs.protobuf-source-dir }}
+          output-dir: ${{ inputs.protobuf-output-dir }}
+          messages: ${{ inputs.protobuf-messages }}
+          mypy-out: ${{ inputs.protobuf-mypy-out }}
 
       - name: Run mypy
         shell: bash

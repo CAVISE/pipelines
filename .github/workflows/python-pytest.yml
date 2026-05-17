@@ -108,47 +108,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - name: Setup Python and dependencies
+        uses: CAVISE/pipelines/actions/setup-python-pip@ci/opencda-workflow
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
           cache-dependency-path: ${{ inputs.cache-dependency-path }}
-
-      - name: Upgrade pip
-        shell: bash
-        working-directory: ${{ inputs.working-directory }}
-        run: python -m pip install --upgrade pip
-
-      - name: Install requirements
-        if: inputs.requirements-file != ''
-        shell: bash
-        working-directory: ${{ inputs.working-directory }}
-        env:
-          REQUIREMENTS_FILE: ${{ inputs.requirements-file }}
-        run: python -m pip install -r "$REQUIREMENTS_FILE"
+          requirements-file: ${{ inputs.requirements-file }}
+          working-directory: ${{ inputs.working-directory }}
 
       - name: Generate protobufs
         if: inputs.protobuf-generate
-        shell: bash
-        working-directory: ${{ inputs.working-directory }}
-        env:
-          PROTOBUF_MESSAGES: ${{ inputs.protobuf-messages }}
-          PROTOBUF_MYPY_OUT: ${{ inputs.protobuf-mypy-out }}
-          PROTOBUF_OUTPUT_DIR: ${{ inputs.protobuf-output-dir }}
-          PROTOBUF_SOURCE_DIR: ${{ inputs.protobuf-source-dir }}
-        run: |
-          mkdir -p "$PROTOBUF_OUTPUT_DIR"
-          command -v protoc
-          protoc --version
-
-          proto_files=$(python -c 'import json, os, pathlib; source = pathlib.Path(os.environ["PROTOBUF_SOURCE_DIR"]); print(" ".join(str(source / f"{name}.proto") for name in json.loads(os.environ["PROTOBUF_MESSAGES"])))')
-          args=("--proto_path=$PROTOBUF_SOURCE_DIR" "--python_out=$PROTOBUF_OUTPUT_DIR")
-          if [[ "$PROTOBUF_MYPY_OUT" == "true" ]]; then
-            args+=("--mypy_out=$PROTOBUF_OUTPUT_DIR")
-          fi
-
-          protoc "${args[@]}" $proto_files
+        uses: CAVISE/pipelines/actions/generate-protobufs@ci/opencda-workflow
+        with:
+          generator: protoc
+          source-dir: ${{ inputs.protobuf-source-dir }}
+          output-dir: ${{ inputs.protobuf-output-dir }}
+          messages: ${{ inputs.protobuf-messages }}
+          mypy-out: ${{ inputs.protobuf-mypy-out }}
+          working-directory: ${{ inputs.working-directory }}
 
       - name: Run pytest with JUnit
         if: inputs.junit
