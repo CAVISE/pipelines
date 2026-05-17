@@ -1,0 +1,51 @@
+name: Python Pre-Commit
+
+"on":
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      python-version:
+        description: Python version passed to actions/setup-python.
+        type: string
+        default: "3.12"
+      skip-hooks:
+        description: Comma-separated pre-commit hook IDs passed through SKIP.
+        type: string
+        default: ""
+      all-files:
+        description: Whether to run pre-commit against all files.
+        type: boolean
+        default: true
+
+jobs:
+  pre-commit:
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Run pre-commit on all files
+        if: inputs.all-files
+        uses: pre-commit/action@v3.0.1
+        env:
+          SKIP: ${{ inputs.skip-hooks }}
+        with:
+          extra_args: >-
+            --all-files
+
+      - name: Run pre-commit
+        if: ${{ !inputs.all-files }}
+        uses: pre-commit/action@v3.0.1
+        env:
+          SKIP: ${{ inputs.skip-hooks }}
