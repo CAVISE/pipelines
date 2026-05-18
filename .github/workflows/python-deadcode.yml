@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: CAVISE/pipelines/actions/setup-python-pip@ci/opencda-workflow
+        uses: CAVISE/pipelines/actions/setup-python-pip@main
         with:
           python-version: ${{ inputs.python-version }}
 
