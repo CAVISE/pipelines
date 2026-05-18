@@ -1,0 +1,57 @@
+name: Python Deadcode
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 30
+      python-version:
+        description: Python version passed to actions/setup-python.
+        type: string
+        default: "3.12"
+      target-path:
+        description: Path checked by deadcode.
+        type: string
+        default: .
+
+jobs:
+  unused-code-check:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: CAVISE/pipelines/actions/setup-python-pip@main
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install dependencies
+        shell: bash
+        run: python -m pip install deadcode
+
+      - name: Run deadcode
+        shell: bash
+        env:
+          DEADCODE_TARGET_PATH: ${{ inputs.target-path }}
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          from deadcode.cli import main
+
+          result = main([os.environ["DEADCODE_TARGET_PATH"]])
+          if result is not None:
+              print(result)
+              sys.exit(1)
+          PY

@@ -1,0 +1,168 @@
+name: Python Pytest
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 30
+      python-versions:
+        description: JSON array of Python versions.
+        type: string
+        default: '["3.12"]'
+      fail-fast:
+        description: Matrix fail-fast setting.
+        type: boolean
+        default: false
+      cache-dependency-path:
+        description: Dependency files used as pip cache keys.
+        type: string
+        default: ""
+      requirements-file:
+        description: Requirements file installed with pip.
+        type: string
+        default: ""
+      working-directory:
+        description: Directory where Python commands run.
+        type: string
+        default: .
+      matplotlib-backend:
+        description: MPLBACKEND value for matplotlib-based tests.
+        type: string
+        default: ""
+      pythonpath:
+        description: PYTHONPATH value for Python commands.
+        type: string
+        default: ""
+      protobuf-generate:
+        description: Whether to generate Python files from protobuf definitions.
+        type: boolean
+        default: false
+      protobuf-source-dir:
+        description: Directory containing .proto files.
+        type: string
+        default: ""
+      protobuf-output-dir:
+        description: Directory for generated protobuf Python files.
+        type: string
+        default: ""
+      protobuf-messages:
+        description: JSON array of protobuf message base names without .proto.
+        type: string
+        default: "[]"
+      protobuf-mypy-out:
+        description: Whether to generate mypy protobuf stubs.
+        type: boolean
+        default: false
+      pytest-maxfail:
+        description: Value passed to pytest --maxfail.
+        type: number
+        default: 0
+      pytest-continue-on-collection-errors:
+        description: Whether to pass --continue-on-collection-errors.
+        type: boolean
+        default: false
+      junit:
+        description: Whether to generate a JUnit report.
+        type: boolean
+        default: true
+      report-dir:
+        description: Directory for generated JUnit reports.
+        type: string
+        default: reports
+      upload-artifact:
+        description: Whether to upload the JUnit report.
+        type: boolean
+        default: true
+      artifact-name-prefix:
+        description: Artifact name prefix for JUnit reports.
+        type: string
+        default: pytest-junit
+      artifact-if-no-files-found:
+        description: "Behavior when the JUnit report is missing: warn, error, or ignore."
+        type: string
+        default: error
+
+jobs:
+  pytest:
+    name: pytest (${{ matrix.python-version }})
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    env:
+      MPLBACKEND: ${{ inputs.matplotlib-backend }}
+      PYTHONPATH: ${{ inputs.pythonpath }}
+
+    strategy:
+      fail-fast: ${{ inputs.fail-fast }}
+      matrix:
+        python-version: ${{ fromJson(inputs.python-versions) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python and dependencies
+        uses: CAVISE/pipelines/actions/setup-python-pip@main
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+          requirements-file: ${{ inputs.requirements-file }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Generate protobufs
+        if: inputs.protobuf-generate
+        uses: CAVISE/pipelines/actions/generate-protobufs@main
+        with:
+          generator: protoc
+          source-dir: ${{ inputs.protobuf-source-dir }}
+          output-dir: ${{ inputs.protobuf-output-dir }}
+          messages: ${{ inputs.protobuf-messages }}
+          mypy-out: ${{ inputs.protobuf-mypy-out }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Run pytest with JUnit
+        if: inputs.junit
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PYTEST_CONTINUE_ON_COLLECTION_ERRORS: ${{ inputs.pytest-continue-on-collection-errors }}
+          PYTEST_MAXFAIL: ${{ inputs.pytest-maxfail }}
+          PYTEST_REPORT_DIR: ${{ inputs.report-dir }}
+        run: |
+          mkdir -p "$PYTEST_REPORT_DIR"
+          if [[ "$PYTEST_CONTINUE_ON_COLLECTION_ERRORS" == "true" ]]; then
+            pytest -ra --maxfail="$PYTEST_MAXFAIL" --continue-on-collection-errors \
+              --junitxml="$PYTEST_REPORT_DIR/pytest-${{ matrix.python-version }}.xml"
+          else
+            pytest -ra --maxfail="$PYTEST_MAXFAIL" \
+              --junitxml="$PYTEST_REPORT_DIR/pytest-${{ matrix.python-version }}.xml"
+          fi
+
+      - name: Run pytest
+        if: ${{ !inputs.junit }}
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PYTEST_CONTINUE_ON_COLLECTION_ERRORS: ${{ inputs.pytest-continue-on-collection-errors }}
+          PYTEST_MAXFAIL: ${{ inputs.pytest-maxfail }}
+        run: |
+          if [[ "$PYTEST_CONTINUE_ON_COLLECTION_ERRORS" == "true" ]]; then
+            pytest -ra --maxfail="$PYTEST_MAXFAIL" --continue-on-collection-errors
+          else
+            pytest -ra --maxfail="$PYTEST_MAXFAIL"
+          fi
+
+      - name: Upload JUnit report
+        if: always() && inputs.junit && inputs.upload-artifact && !env.ACT
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-name-prefix }}-${{ matrix.python-version }}
+          path: ${{ inputs.working-directory }}/${{ inputs.report-dir }}/pytest-${{ matrix.python-version }}.xml
+          if-no-files-found: ${{ inputs.artifact-if-no-files-found }}

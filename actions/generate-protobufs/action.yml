@@ -1,0 +1,69 @@
+name: Generate Protobufs
+description: Generate Python protobuf modules with protoc or grpc_tools.protoc.
+
+inputs:
+  generator:
+    description: Protobuf generator, either protoc or grpc-tools.
+    required: false
+    default: protoc
+  source-dir:
+    description: Directory containing .proto files.
+    required: true
+  output-dir:
+    description: Directory for generated protobuf Python files.
+    required: true
+  messages:
+    description: JSON array of protobuf message base names without .proto.
+    required: true
+  mypy-out:
+    description: Whether to generate mypy protobuf stubs.
+    required: false
+    default: "false"
+  working-directory:
+    description: Directory where generation runs.
+    required: false
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - name: Generate with protoc
+      if: inputs.generator == 'protoc'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        PROTOBUF_MESSAGES: ${{ inputs.messages }}
+        PROTOBUF_MYPY_OUT: ${{ inputs.mypy-out }}
+        PROTOBUF_OUTPUT_DIR: ${{ inputs.output-dir }}
+        PROTOBUF_SOURCE_DIR: ${{ inputs.source-dir }}
+      run: |
+        mkdir -p "$PROTOBUF_OUTPUT_DIR"
+        command -v protoc
+        protoc --version
+
+        proto_files=$(python -c 'import json, os, pathlib; source = pathlib.Path(os.environ["PROTOBUF_SOURCE_DIR"]); print(" ".join(str(source / f"{name}.proto") for name in json.loads(os.environ["PROTOBUF_MESSAGES"])))')
+        args=("--proto_path=$PROTOBUF_SOURCE_DIR" "--python_out=$PROTOBUF_OUTPUT_DIR")
+        if [[ "$PROTOBUF_MYPY_OUT" == "true" ]]; then
+          args+=("--mypy_out=$PROTOBUF_OUTPUT_DIR")
+        fi
+
+        protoc "${args[@]}" $proto_files
+
+    - name: Generate with grpc_tools.protoc
+      if: inputs.generator == 'grpc-tools'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        PROTOBUF_MESSAGES: ${{ inputs.messages }}
+        PROTOBUF_MYPY_OUT: ${{ inputs.mypy-out }}
+        PROTOBUF_OUTPUT_DIR: ${{ inputs.output-dir }}
+        PROTOBUF_SOURCE_DIR: ${{ inputs.source-dir }}
+      run: |
+        mkdir -p "$PROTOBUF_OUTPUT_DIR"
+        proto_files=$(python -c 'import json, os, pathlib; source = pathlib.Path(os.environ["PROTOBUF_SOURCE_DIR"]); print(" ".join(str(source / f"{name}.proto") for name in json.loads(os.environ["PROTOBUF_MESSAGES"])))')
+        args=("-I" "$PROTOBUF_SOURCE_DIR" "--python_out=$PROTOBUF_OUTPUT_DIR")
+        if [[ "$PROTOBUF_MYPY_OUT" == "true" ]]; then
+          args+=("--mypy_out=$PROTOBUF_OUTPUT_DIR")
+        fi
+
+        python -m grpc_tools.protoc "${args[@]}" $proto_files

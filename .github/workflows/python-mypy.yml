@@ -1,0 +1,87 @@
+name: Python Mypy
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 30
+      python-version:
+        description: Python version passed to actions/setup-python.
+        type: string
+        default: "3.12"
+      target-path:
+        description: Path checked by mypy.
+        type: string
+        default: .
+      follow-imports-silent:
+        description: Whether to pass --follow-imports=silent.
+        type: boolean
+        default: true
+      protobuf-generate:
+        description: Whether to generate protobuf modules before mypy.
+        type: boolean
+        default: false
+      protobuf-source-dir:
+        description: Directory containing .proto files.
+        type: string
+        default: ""
+      protobuf-output-dir:
+        description: Directory for generated protobuf Python files.
+        type: string
+        default: ""
+      protobuf-messages:
+        description: JSON array of protobuf message base names without .proto.
+        type: string
+        default: "[]"
+      protobuf-mypy-out:
+        description: Whether to generate mypy protobuf stubs.
+        type: boolean
+        default: true
+
+jobs:
+  type-check:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: CAVISE/pipelines/actions/setup-python-pip@main
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install dependencies
+        shell: bash
+        run: python -m pip install mypy mypy-protobuf grpcio-tools
+
+      - name: Generate protobuf modules
+        if: inputs.protobuf-generate
+        uses: CAVISE/pipelines/actions/generate-protobufs@main
+        with:
+          generator: grpc-tools
+          source-dir: ${{ inputs.protobuf-source-dir }}
+          output-dir: ${{ inputs.protobuf-output-dir }}
+          messages: ${{ inputs.protobuf-messages }}
+          mypy-out: ${{ inputs.protobuf-mypy-out }}
+
+      - name: Run mypy
+        shell: bash
+        env:
+          FOLLOW_IMPORTS_SILENT: ${{ inputs.follow-imports-silent }}
+          MYPY_TARGET_PATH: ${{ inputs.target-path }}
+        run: |
+          if [[ "$FOLLOW_IMPORTS_SILENT" == "true" ]]; then
+            mypy "$MYPY_TARGET_PATH" --follow-imports=silent
+          else
+            mypy "$MYPY_TARGET_PATH"
+          fi
