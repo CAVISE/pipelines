@@ -31,9 +31,14 @@ on:
         description: Skip scans triggered by dependabot[bot] to avoid permission issues.
         type: boolean
         default: true
+      upload-artifact:
+        description: Whether to upload the SARIF report as a workflow artifact.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   semgrep:
@@ -57,8 +62,23 @@ jobs:
           SEMGREP_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
           SEMGREP_TARGET: ${{ inputs.target }}
         run: |
-          semgrep_args=(scan --config="$SEMGREP_CONFIG")
+          mkdir -p reports
+          semgrep_args=(scan --config="$SEMGREP_CONFIG" --sarif --output=reports/semgrep.sarif)
           if [[ "$SEMGREP_FAIL_ON_FINDINGS" == "true" ]]; then
             semgrep_args+=(--error)
           fi
           semgrep "${semgrep_args[@]}" -- "$SEMGREP_TARGET"
+
+      - name: Upload SARIF to Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: reports/semgrep.sarif
+
+      - name: Upload SARIF artifact
+        if: always() && inputs.upload-artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: semgrep-sarif
+          path: reports/semgrep.sarif
+          if-no-files-found: error
