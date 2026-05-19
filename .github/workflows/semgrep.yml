@@ -41,7 +41,7 @@ jobs:
     runs-on: ${{ inputs.runs-on }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     container:
-      image: semgrep/semgrep:1.163.0-nonroot
+      image: semgrep/semgrep:1.163.0
     if: ${{ !inputs.skip-dependabot || github.actor != 'dependabot[bot]' }}
 
     steps:
