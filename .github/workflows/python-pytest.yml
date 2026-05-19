@@ -1,0 +1,156 @@
+name: Python Pytest
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 30
+      python-versions:
+        description: JSON array of Python versions.
+        type: string
+        default: '["3.12"]'
+      fail-fast:
+        description: Matrix fail-fast setting.
+        type: boolean
+        default: false
+      cache-dependency-path:
+        description: Dependency files used as pip cache keys.
+        type: string
+        default: ""
+      requirements-file:
+        description: Requirements file installed with pip.
+        type: string
+        required: true
+      working-directory:
+        description: Directory where Python commands run.
+        type: string
+        default: .
+      matplotlib-backend:
+        description: MPLBACKEND value for matplotlib-based tests.
+        type: string
+        default: ""
+      protobuf-generate:
+        description: Whether to generate Python files from protobuf definitions.
+        type: boolean
+        default: false
+      protobuf-source-dir:
+        description: Directory containing .proto files.
+        type: string
+        default: ""
+      protobuf-output-dir:
+        description: Directory for generated protobuf Python files.
+        type: string
+        default: ""
+      protobuf-messages:
+        description: JSON array of protobuf message base names without .proto.
+        type: string
+        default: "[]"
+      protobuf-mypy-out:
+        description: Whether to generate mypy protobuf stubs.
+        type: boolean
+        default: false
+      pytest-maxfail:
+        description: Value passed to pytest --maxfail.
+        type: number
+        default: 0
+      pytest-continue-on-collection-errors:
+        description: Whether to pass --continue-on-collection-errors.
+        type: boolean
+        default: false
+      pytest-test-path:
+        description: Test path passed to pytest.
+        type: string
+        default: .
+      coverage:
+        description: Whether to run pytest with coverage.
+        type: boolean
+        default: false
+      coverage-paths:
+        description: JSON array of coverage source paths.
+        type: string
+        default: "[]"
+      upload-artifact:
+        description: Whether to upload the JUnit report.
+        type: boolean
+        default: true
+
+jobs:
+  pytest:
+    name: pytest (${{ matrix.python-version }})
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    env:
+      MPLBACKEND: ${{ inputs.matplotlib-backend }}
+
+    strategy:
+      fail-fast: ${{ inputs.fail-fast }}
+      matrix:
+        python-version: ${{ fromJson(inputs.python-versions) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python and dependencies
+        uses: CAVISE/pipelines/actions/setup-python-pip@ci/scenario-manager-workflows
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Install requirements
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          REQUIREMENTS_FILE: ${{ inputs.requirements-file }}
+        run: python -m pip install -r "$REQUIREMENTS_FILE"
+
+      - name: Generate protobufs
+        if: inputs.protobuf-generate
+        uses: CAVISE/pipelines/actions/generate-protobufs@ci/scenario-manager-workflows
+        with:
+          generator: protoc
+          source-dir: ${{ inputs.protobuf-source-dir }}
+          output-dir: ${{ inputs.protobuf-output-dir }}
+          messages: ${{ inputs.protobuf-messages }}
+          mypy-out: ${{ inputs.protobuf-mypy-out }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Run pytest
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PYTEST_CONTINUE_ON_COLLECTION_ERRORS: ${{ inputs.pytest-continue-on-collection-errors }}
+          PYTEST_COVERAGE: ${{ inputs.coverage }}
+          PYTEST_COVERAGE_PATHS: ${{ inputs.coverage-paths }}
+          PYTEST_MAXFAIL: ${{ inputs.pytest-maxfail }}
+          PYTEST_TEST_PATH: ${{ inputs.pytest-test-path }}
+        run: |
+          mkdir -p reports
+          pytest_args=(-ra --maxfail="$PYTEST_MAXFAIL")
+          if [[ "$PYTEST_CONTINUE_ON_COLLECTION_ERRORS" == "true" ]]; then
+            pytest_args+=(--continue-on-collection-errors)
+          fi
+          if [[ "$PYTEST_COVERAGE" == "true" ]]; then
+            while IFS= read -r coverage_path; do
+              pytest_args+=("--cov=$coverage_path")
+            done < <(python -c 'import json, os; [print(path) for path in json.loads(os.environ["PYTEST_COVERAGE_PATHS"])]')
+            pytest_args+=(--cov-report=term-missing)
+          fi
+          pytest "${pytest_args[@]}" --junitxml="reports/pytest-${{ matrix.python-version }}.xml" -- "$PYTEST_TEST_PATH"
+
+      - name: Upload JUnit report
+        if: always() && inputs.upload-artifact && !env.ACT
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-junit-${{ matrix.python-version }}
+          path: ${{ inputs.working-directory }}/reports/pytest-${{ matrix.python-version }}.xml
+          if-no-files-found: error

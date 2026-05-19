@@ -1,0 +1,165 @@
+name: Node Yarn Quality
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 30
+      node-version:
+        description: Node.js version passed to actions/setup-node.
+        type: string
+        default: "22"
+      working-directory:
+        description: Directory where Yarn commands run.
+        type: string
+        default: .
+      cache-dependency-path:
+        description: Yarn lockfile path used as the cache key.
+        type: string
+        default: yarn.lock
+      frozen-lockfile:
+        description: Whether to use yarn install --frozen-lockfile.
+        type: boolean
+        default: true
+      run-eslint:
+        description: Whether to run ESLint.
+        type: boolean
+        default: true
+      eslint-target:
+        description: Path checked by ESLint.
+        type: string
+        default: .
+      eslint-extensions:
+        description: Comma-separated file extensions checked by ESLint.
+        type: string
+        default: ts,tsx
+      run-stylelint:
+        description: Whether to run Stylelint.
+        type: boolean
+        default: false
+      stylelint-pattern:
+        description: File pattern checked by Stylelint.
+        type: string
+        default: src/**/*.{css,scss,sass}
+      run-type-check:
+        description: Whether to run TypeScript type checking.
+        type: boolean
+        default: true
+      tsconfig:
+        description: TypeScript project config.
+        type: string
+        default: tsconfig.json
+      run-build:
+        description: Whether to run Vite build.
+        type: boolean
+        default: false
+
+jobs:
+  eslint:
+    if: inputs.run-eslint
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node and dependencies
+        uses: CAVISE/pipelines/actions/setup-node-yarn@ci/scenario-manager-workflows
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+          working-directory: ${{ inputs.working-directory }}
+          frozen-lockfile: ${{ inputs.frozen-lockfile }}
+
+      - name: Run ESLint
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          ESLINT_EXTENSIONS: ${{ inputs.eslint-extensions }}
+          ESLINT_TARGET: ${{ inputs.eslint-target }}
+        run: yarn eslint --ext "$ESLINT_EXTENSIONS" -- "$ESLINT_TARGET"
+
+  stylelint:
+    if: inputs.run-stylelint
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node and dependencies
+        uses: CAVISE/pipelines/actions/setup-node-yarn@ci/scenario-manager-workflows
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+          working-directory: ${{ inputs.working-directory }}
+          frozen-lockfile: ${{ inputs.frozen-lockfile }}
+
+      - name: Run Stylelint
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          STYLELINT_PATTERN: ${{ inputs.stylelint-pattern }}
+        run: yarn stylelint -- "$STYLELINT_PATTERN"
+
+  type-check:
+    if: inputs.run-type-check
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node and dependencies
+        uses: CAVISE/pipelines/actions/setup-node-yarn@ci/scenario-manager-workflows
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+          working-directory: ${{ inputs.working-directory }}
+          frozen-lockfile: ${{ inputs.frozen-lockfile }}
+
+      - name: Run TypeScript type check
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          TSCONFIG: ${{ inputs.tsconfig }}
+        run: yarn tsc -p "$TSCONFIG" --noEmit
+
+  build:
+    if: inputs.run-build
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node and dependencies
+        uses: CAVISE/pipelines/actions/setup-node-yarn@ci/scenario-manager-workflows
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+          working-directory: ${{ inputs.working-directory }}
+          frozen-lockfile: ${{ inputs.frozen-lockfile }}
+
+      - name: Run Vite build
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        run: yarn vite build

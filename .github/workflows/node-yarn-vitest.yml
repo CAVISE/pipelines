@@ -1,0 +1,64 @@
+name: Node Yarn Vitest
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 30
+      node-version:
+        description: Node.js version passed to actions/setup-node.
+        type: string
+        default: "22"
+      working-directory:
+        description: Directory where Yarn commands run.
+        type: string
+        default: .
+      cache-dependency-path:
+        description: Yarn lockfile path used as the cache key.
+        type: string
+        default: yarn.lock
+      frozen-lockfile:
+        description: Whether to use yarn install --frozen-lockfile.
+        type: boolean
+        default: true
+      coverage:
+        description: Whether to run Vitest with coverage.
+        type: boolean
+        default: false
+
+jobs:
+  vitest:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node and dependencies
+        uses: CAVISE/pipelines/actions/setup-node-yarn@ci/scenario-manager-workflows
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+          working-directory: ${{ inputs.working-directory }}
+          frozen-lockfile: ${{ inputs.frozen-lockfile }}
+
+      - name: Run Vitest with coverage
+        if: inputs.coverage
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        run: yarn vitest run --coverage
+
+      - name: Run Vitest
+        if: ${{ !inputs.coverage }}
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        run: yarn vitest run
