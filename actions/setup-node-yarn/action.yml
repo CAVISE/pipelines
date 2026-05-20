@@ -1,0 +1,40 @@
+name: Setup Node Yarn
+description: Set up Node.js, enable Yarn cache, and install dependencies.
+
+inputs:
+  node-version:
+    description: Node.js version passed to actions/setup-node.
+    required: true
+  cache-dependency-path:
+    description: Yarn lockfile path used as the cache key.
+    required: true
+  working-directory:
+    description: Directory where dependencies are installed.
+    required: false
+    default: .
+  frozen-lockfile:
+    description: Whether to use yarn install --frozen-lockfile.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: yarn
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        FROZEN_LOCKFILE: ${{ inputs.frozen-lockfile }}
+      run: |
+        if [[ "$FROZEN_LOCKFILE" == "true" ]]; then
+          yarn install --frozen-lockfile
+        else
+          yarn install
+        fi

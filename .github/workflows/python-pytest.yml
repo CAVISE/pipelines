@@ -26,17 +26,13 @@ on:
       requirements-file:
         description: Requirements file installed with pip.
         type: string
-        default: ""
+        required: true
       working-directory:
         description: Directory where Python commands run.
         type: string
         default: .
       matplotlib-backend:
         description: MPLBACKEND value for matplotlib-based tests.
-        type: string
-        default: ""
-      pythonpath:
-        description: PYTHONPATH value for Python commands.
         type: string
         default: ""
       protobuf-generate:
@@ -67,26 +63,22 @@ on:
         description: Whether to pass --continue-on-collection-errors.
         type: boolean
         default: false
-      junit:
-        description: Whether to generate a JUnit report.
-        type: boolean
-        default: true
-      report-dir:
-        description: Directory for generated JUnit reports.
+      pytest-test-path:
+        description: Test path passed to pytest.
         type: string
-        default: reports
+        default: .
+      coverage:
+        description: Whether to run pytest with coverage.
+        type: boolean
+        default: false
+      coverage-paths:
+        description: JSON array of coverage source paths.
+        type: string
+        default: "[]"
       upload-artifact:
         description: Whether to upload the JUnit report.
         type: boolean
         default: true
-      artifact-name-prefix:
-        description: Artifact name prefix for JUnit reports.
-        type: string
-        default: pytest-junit
-      artifact-if-no-files-found:
-        description: "Behavior when the JUnit report is missing: warn, error, or ignore."
-        type: string
-        default: error
 
 jobs:
   pytest:
@@ -97,7 +89,6 @@ jobs:
       contents: read
     env:
       MPLBACKEND: ${{ inputs.matplotlib-backend }}
-      PYTHONPATH: ${{ inputs.pythonpath }}
 
     strategy:
       fail-fast: ${{ inputs.fail-fast }}
@@ -110,11 +101,16 @@ jobs:
 
       - name: Setup Python and dependencies
         uses: CAVISE/pipelines/actions/setup-python-pip@main
-        with:
           python-version: ${{ matrix.python-version }}
           cache-dependency-path: ${{ inputs.cache-dependency-path }}
-          requirements-file: ${{ inputs.requirements-file }}
           working-directory: ${{ inputs.working-directory }}
+
+      - name: Install requirements
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          REQUIREMENTS_FILE: ${{ inputs.requirements-file }}
+        run: python -m pip install -r "$REQUIREMENTS_FILE"
 
       - name: Generate protobufs
         if: inputs.protobuf-generate
@@ -127,42 +123,33 @@ jobs:
           mypy-out: ${{ inputs.protobuf-mypy-out }}
           working-directory: ${{ inputs.working-directory }}
 
-      - name: Run pytest with JUnit
-        if: inputs.junit
-        shell: bash
-        working-directory: ${{ inputs.working-directory }}
-        env:
-          PYTEST_CONTINUE_ON_COLLECTION_ERRORS: ${{ inputs.pytest-continue-on-collection-errors }}
-          PYTEST_MAXFAIL: ${{ inputs.pytest-maxfail }}
-          PYTEST_REPORT_DIR: ${{ inputs.report-dir }}
-        run: |
-          mkdir -p "$PYTEST_REPORT_DIR"
-          if [[ "$PYTEST_CONTINUE_ON_COLLECTION_ERRORS" == "true" ]]; then
-            pytest -ra --maxfail="$PYTEST_MAXFAIL" --continue-on-collection-errors \
-              --junitxml="$PYTEST_REPORT_DIR/pytest-${{ matrix.python-version }}.xml"
-          else
-            pytest -ra --maxfail="$PYTEST_MAXFAIL" \
-              --junitxml="$PYTEST_REPORT_DIR/pytest-${{ matrix.python-version }}.xml"
-          fi
-
       - name: Run pytest
-        if: ${{ !inputs.junit }}
         shell: bash
         working-directory: ${{ inputs.working-directory }}
         env:
           PYTEST_CONTINUE_ON_COLLECTION_ERRORS: ${{ inputs.pytest-continue-on-collection-errors }}
+          PYTEST_COVERAGE: ${{ inputs.coverage }}
+          PYTEST_COVERAGE_PATHS: ${{ inputs.coverage-paths }}
           PYTEST_MAXFAIL: ${{ inputs.pytest-maxfail }}
+          PYTEST_TEST_PATH: ${{ inputs.pytest-test-path }}
         run: |
+          mkdir -p reports
+          pytest_args=(-ra --maxfail="$PYTEST_MAXFAIL")
           if [[ "$PYTEST_CONTINUE_ON_COLLECTION_ERRORS" == "true" ]]; then
-            pytest -ra --maxfail="$PYTEST_MAXFAIL" --continue-on-collection-errors
-          else
-            pytest -ra --maxfail="$PYTEST_MAXFAIL"
+            pytest_args+=(--continue-on-collection-errors)
           fi
+          if [[ "$PYTEST_COVERAGE" == "true" ]]; then
+            while IFS= read -r coverage_path; do
+              pytest_args+=("--cov=$coverage_path")
+            done < <(python -c 'import json, os; [print(path) for path in json.loads(os.environ["PYTEST_COVERAGE_PATHS"])]')
+            pytest_args+=(--cov-report=term-missing)
+          fi
+          pytest "${pytest_args[@]}" --junitxml="reports/pytest-${{ matrix.python-version }}.xml" -- "$PYTEST_TEST_PATH"
 
       - name: Upload JUnit report
-        if: always() && inputs.junit && inputs.upload-artifact && !env.ACT
+        if: always() && inputs.upload-artifact && !env.ACT
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.artifact-name-prefix }}-${{ matrix.python-version }}
-          path: ${{ inputs.working-directory }}/${{ inputs.report-dir }}/pytest-${{ matrix.python-version }}.xml
-          if-no-files-found: ${{ inputs.artifact-if-no-files-found }}
+          name: pytest-junit-${{ matrix.python-version }}
+          path: ${{ inputs.working-directory }}/reports/pytest-${{ matrix.python-version }}.xml
+          if-no-files-found: error

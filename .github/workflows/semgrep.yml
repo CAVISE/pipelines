@@ -1,0 +1,84 @@
+name: Semgrep
+
+on:
+  workflow_call:
+    inputs:
+      config:
+        description: Semgrep config passed to --config.
+        type: string
+        default: auto
+      target:
+        description: Target path for Semgrep scan.
+        type: string
+        default: .
+      fail-on-findings:
+        description: Fail when findings are detected by adding --error.
+        type: boolean
+        default: false
+      runs-on:
+        description: Runner label for the Semgrep job.
+        type: string
+        default: ubuntu-24.04
+      checkout-fetch-depth:
+        description: Fetch depth passed to actions/checkout.
+        type: number
+        default: 0
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 30
+      skip-dependabot:
+        description: Skip scans triggered by dependabot[bot] to avoid permission issues.
+        type: boolean
+        default: true
+      upload-artifact:
+        description: Whether to upload the SARIF report as a workflow artifact.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Semgrep
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    container:
+      image: semgrep/semgrep:1.163.0
+    if: ${{ !inputs.skip-dependabot || github.actor != 'dependabot[bot]' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: ${{ inputs.checkout-fetch-depth }}
+
+      - name: Run Semgrep scan
+        shell: bash
+        env:
+          SEMGREP_CONFIG: ${{ inputs.config }}
+          SEMGREP_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+          SEMGREP_TARGET: ${{ inputs.target }}
+        run: |
+          mkdir -p reports
+          semgrep_args=(scan --config="$SEMGREP_CONFIG" --sarif --output=reports/semgrep.sarif)
+          if [[ "$SEMGREP_FAIL_ON_FINDINGS" == "true" ]]; then
+            semgrep_args+=(--error)
+          fi
+          semgrep "${semgrep_args[@]}" -- "$SEMGREP_TARGET"
+
+      - name: Upload SARIF to Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: reports/semgrep.sarif
+
+      - name: Upload SARIF artifact
+        if: always() && inputs.upload-artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: semgrep-sarif
+          path: reports/semgrep.sarif
+          if-no-files-found: error
