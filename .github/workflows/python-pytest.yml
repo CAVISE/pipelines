@@ -114,7 +114,7 @@ jobs:
 
       - name: Generate protobufs
         if: inputs.protobuf-generate
-        uses: CAVISE/pipelines/actions/generate-protobufs@ci/scenario-manager-workflows
+        uses: CAVISE/pipelines/actions/generate-protobufs@main
         with:
           generator: protoc
           source-dir: ${{ inputs.protobuf-source-dir }}
