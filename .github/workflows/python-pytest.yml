@@ -101,6 +101,7 @@ jobs:
 
       - name: Setup Python and dependencies
         uses: CAVISE/pipelines/actions/setup-python-pip@main
+        with:
           python-version: ${{ matrix.python-version }}
           cache-dependency-path: ${{ inputs.cache-dependency-path }}
           working-directory: ${{ inputs.working-directory }}
