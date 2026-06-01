@@ -79,6 +79,14 @@ on:
         description: Whether to upload the JUnit report.
         type: boolean
         default: true
+      report-dir:
+        description: Directory for test reports.
+        type: string
+        default: reports
+      artifact-name-prefix:
+        description: Prefix for uploaded pytest JUnit artifact.
+        type: string
+        default: pytest-junit
 
 jobs:
   pytest:
