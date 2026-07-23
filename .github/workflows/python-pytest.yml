@@ -155,7 +155,7 @@ jobs:
 
       - name: Generate protobufs
         if: inputs.protobuf-generate
-        uses: CAVISE/pipelines/actions/generate-protobufs@main
+        uses: CAVISE/pipelines/actions/generate-protobufs@feature/opencda-cmake-build
         with:
           generator: ${{ inputs.protobuf-generator }}
           source-dir: ${{ inputs.protobuf-source-dir }}
