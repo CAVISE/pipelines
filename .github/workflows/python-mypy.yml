@@ -23,10 +23,22 @@ on:
         description: Whether to pass --follow-imports=silent.
         type: boolean
         default: true
+      cache-dependency-path:
+        description: Dependency files used as pip cache keys.
+        type: string
+        default: ""
+      requirements-file:
+        description: Optional requirements file installed before mypy.
+        type: string
+        default: ""
       protobuf-generate:
         description: Whether to generate protobuf modules before mypy.
         type: boolean
         default: false
+      protobuf-generator:
+        description: Protobuf generator, one of grpc-tools, protoc, or cmake.
+        type: string
+        default: grpc-tools
       protobuf-source-dir:
         description: Directory containing .proto files.
         type: string
@@ -43,6 +55,34 @@ on:
         description: Whether to generate mypy protobuf stubs.
         type: boolean
         default: true
+      protobuf-protoc-version:
+        description: Exact protoc release used by the CMake generator.
+        type: string
+        default: "34.1"
+      protobuf-cmake-source-dir:
+        description: CMake source directory.
+        type: string
+        default: .
+      protobuf-cmake-build-dir:
+        description: CMake build directory.
+        type: string
+        default: build/protobuf
+      protobuf-cmake-configure-preset:
+        description: Named CMake configure preset used for protobuf generation.
+        type: string
+        default: protobuf
+      protobuf-cmake-build-preset:
+        description: Named CMake build preset used for protobuf generation.
+        type: string
+        default: protobuf
+      protobuf-cmake-install-prefix:
+        description: CMake installation prefix.
+        type: string
+        default: .
+      protobuf-cmake-artifact-manifest:
+        description: Protobuf artifact manifest under the install prefix.
+        type: string
+        default: protobuf-artifacts.manifest
 
 jobs:
   type-check:
@@ -59,20 +99,40 @@ jobs:
         uses: CAVISE/pipelines/actions/setup-python-pip@main
         with:
           python-version: ${{ inputs.python-version }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
 
-      - name: Install dependencies
+      - name: Install mypy
         shell: bash
-        run: python -m pip install mypy mypy-protobuf grpcio-tools
+        run: python -m pip install mypy
+
+      - name: Install requirements
+        if: inputs.requirements-file != ''
+        shell: bash
+        env:
+          REQUIREMENTS_FILE: ${{ inputs.requirements-file }}
+        run: python -m pip install -r "$REQUIREMENTS_FILE"
+
+      - name: Install direct protobuf generation dependencies
+        if: inputs.protobuf-generate && inputs.protobuf-generator != 'cmake'
+        shell: bash
+        run: python -m pip install mypy-protobuf grpcio-tools
 
       - name: Generate protobuf modules
         if: inputs.protobuf-generate
         uses: CAVISE/pipelines/actions/generate-protobufs@main
         with:
-          generator: grpc-tools
+          generator: ${{ inputs.protobuf-generator }}
           source-dir: ${{ inputs.protobuf-source-dir }}
           output-dir: ${{ inputs.protobuf-output-dir }}
           messages: ${{ inputs.protobuf-messages }}
           mypy-out: ${{ inputs.protobuf-mypy-out }}
+          protoc-version: ${{ inputs.protobuf-protoc-version }}
+          cmake-source-dir: ${{ inputs.protobuf-cmake-source-dir }}
+          cmake-build-dir: ${{ inputs.protobuf-cmake-build-dir }}
+          cmake-configure-preset: ${{ inputs.protobuf-cmake-configure-preset }}
+          cmake-build-preset: ${{ inputs.protobuf-cmake-build-preset }}
+          cmake-install-prefix: ${{ inputs.protobuf-cmake-install-prefix }}
+          cmake-artifact-manifest: ${{ inputs.protobuf-cmake-artifact-manifest }}
 
       - name: Run mypy
         shell: bash
