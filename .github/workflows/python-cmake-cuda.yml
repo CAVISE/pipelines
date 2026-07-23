@@ -93,6 +93,7 @@ jobs:
             cmake==4.2.3 \
             ninja==1.13.0 \
             -r "$REQUIREMENTS_FILE"
+          echo "/opt/python-cmake-cuda/bin" >> "$GITHUB_PATH"
 
       - name: Configure and build CUDA extensions
         working-directory: ${{ inputs.working-directory }}
