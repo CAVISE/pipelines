@@ -39,6 +39,10 @@ on:
         description: Whether to generate Python files from protobuf definitions.
         type: boolean
         default: false
+      protobuf-generator:
+        description: Protobuf generator, one of protoc, grpc-tools, or cmake.
+        type: string
+        default: protoc
       protobuf-source-dir:
         description: Directory containing .proto files.
         type: string
@@ -55,6 +59,34 @@ on:
         description: Whether to generate mypy protobuf stubs.
         type: boolean
         default: false
+      protobuf-protoc-version:
+        description: Exact protoc release used by the CMake generator.
+        type: string
+        default: "34.1"
+      protobuf-cmake-source-dir:
+        description: CMake source directory.
+        type: string
+        default: .
+      protobuf-cmake-build-dir:
+        description: CMake build directory.
+        type: string
+        default: build/protobuf
+      protobuf-cmake-configure-preset:
+        description: Named CMake configure preset used for protobuf generation.
+        type: string
+        default: protobuf
+      protobuf-cmake-build-preset:
+        description: Named CMake build preset used for protobuf generation.
+        type: string
+        default: protobuf
+      protobuf-cmake-install-prefix:
+        description: CMake installation prefix.
+        type: string
+        default: .
+      protobuf-cmake-artifact-manifest:
+        description: Protobuf artifact manifest under the install prefix.
+        type: string
+        default: protobuf-artifacts.manifest
       pytest-maxfail:
         description: Value passed to pytest --maxfail.
         type: number
@@ -123,14 +155,21 @@ jobs:
 
       - name: Generate protobufs
         if: inputs.protobuf-generate
-        uses: CAVISE/pipelines/actions/generate-protobufs@main
+        uses: CAVISE/pipelines/actions/generate-protobufs@feature/opencda-cmake-build
         with:
-          generator: protoc
+          generator: ${{ inputs.protobuf-generator }}
           source-dir: ${{ inputs.protobuf-source-dir }}
           output-dir: ${{ inputs.protobuf-output-dir }}
           messages: ${{ inputs.protobuf-messages }}
           mypy-out: ${{ inputs.protobuf-mypy-out }}
           working-directory: ${{ inputs.working-directory }}
+          protoc-version: ${{ inputs.protobuf-protoc-version }}
+          cmake-source-dir: ${{ inputs.protobuf-cmake-source-dir }}
+          cmake-build-dir: ${{ inputs.protobuf-cmake-build-dir }}
+          cmake-configure-preset: ${{ inputs.protobuf-cmake-configure-preset }}
+          cmake-build-preset: ${{ inputs.protobuf-cmake-build-preset }}
+          cmake-install-prefix: ${{ inputs.protobuf-cmake-install-prefix }}
+          cmake-artifact-manifest: ${{ inputs.protobuf-cmake-artifact-manifest }}
 
       - name: Run pytest
         shell: bash
@@ -140,9 +179,10 @@ jobs:
           PYTEST_COVERAGE: ${{ inputs.coverage }}
           PYTEST_COVERAGE_PATHS: ${{ inputs.coverage-paths }}
           PYTEST_MAXFAIL: ${{ inputs.pytest-maxfail }}
+          PYTEST_REPORT_DIR: ${{ inputs.report-dir }}
           PYTEST_TEST_PATH: ${{ inputs.pytest-test-path }}
         run: |
-          mkdir -p reports
+          mkdir -p "$PYTEST_REPORT_DIR"
           pytest_args=(-ra --maxfail="$PYTEST_MAXFAIL")
           if [[ "$PYTEST_CONTINUE_ON_COLLECTION_ERRORS" == "true" ]]; then
             pytest_args+=(--continue-on-collection-errors)
@@ -153,12 +193,12 @@ jobs:
             done < <(python -c 'import json, os; [print(path) for path in json.loads(os.environ["PYTEST_COVERAGE_PATHS"])]')
             pytest_args+=(--cov-report=term-missing)
           fi
-          pytest "${pytest_args[@]}" --junitxml="reports/pytest-${{ matrix.python-version }}.xml" -- "$PYTEST_TEST_PATH"
+          pytest "${pytest_args[@]}" --junitxml="$PYTEST_REPORT_DIR/pytest-${{ matrix.python-version }}.xml" -- "$PYTEST_TEST_PATH"
 
       - name: Upload JUnit report
         if: always() && inputs.upload-artifact && !env.ACT
         uses: actions/upload-artifact@v7
         with:
-          name: pytest-junit-${{ matrix.python-version }}
-          path: ${{ inputs.working-directory }}/reports/pytest-${{ matrix.python-version }}.xml
+          name: ${{ inputs.artifact-name-prefix }}-${{ matrix.python-version }}
+          path: ${{ inputs.working-directory }}/${{ inputs.report-dir }}/pytest-${{ matrix.python-version }}.xml
           if-no-files-found: error
