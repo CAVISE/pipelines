@@ -19,6 +19,7 @@ Reusable workflows accept only predefined typed inputs. They must not accept she
 
 - `actions/setup-python-pip` sets up Python, enables pip cache, upgrades pip, and optionally installs a requirements file.
 - `actions/generate-protobufs` generates Python protobuf modules using `protoc`, `grpc_tools.protoc`, or named CMake presets.
+- `actions/documentation-build` builds a Sphinx site in one or more languages. The `default-language` is published at `build/html`; other requested languages are placed below it, for example `build/html/ru`.
 
 Child repositories should keep their own trigger and composition files, then call these reusable workflows with `jobs.<job_id>.uses`.
 
