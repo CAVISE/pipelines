@@ -11,6 +11,10 @@ on:
         description: Python version passed to actions/setup-python.
         type: string
         default: "3.12"
+      go-version-file:
+        description: Optional Go version file; leave empty to skip Go setup.
+        type: string
+        default: ""
       skip-hooks:
         description: Comma-separated pre-commit hook IDs passed through SKIP.
         type: string
@@ -29,6 +33,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Setup Go
+        if: ${{ inputs.go-version-file != '' }}
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache: true
+          cache-dependency-path: ${{ inputs.go-version-file }}
 
       - name: Setup Python
         uses: CAVISE/pipelines/actions/setup-python-pip@main

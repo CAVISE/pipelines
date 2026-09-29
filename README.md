@@ -15,6 +15,11 @@ Reusable workflows accept only predefined typed inputs. They must not accept she
 - `.github/workflows/python-deadcode.yml` installs and runs deadcode.
 - `.github/workflows/python-pre-commit.yml` runs pre-commit with a controlled `--all-files` flag and optional `SKIP` hook list.
 
+For Go hooks, pass `go-version-file: go.mod` to the pre-commit workflow.
+This installs Go and adds Go tools to PATH before running hooks, with module
+and build caching keyed by the version file. Leave the input empty (the default)
+to keep Python-only workflows unchanged.
+
 ## Composite Actions
 
 - `actions/setup-python-pip` sets up Python, enables pip cache, upgrades pip, and optionally installs a requirements file.
