@@ -1,5 +1,5 @@
 name: Documentation Build
-description: Builds the Documentation repository site for GitHub Pages.
+description: Builds one or more localized Sphinx sites for GitHub Pages.
 
 inputs:
   python-version:
@@ -22,6 +22,14 @@ inputs:
     description: Path to the Sphinx build directory relative to docs-directory.
     required: false
     default: "build"
+  languages:
+    description: Comma-separated Sphinx language codes to build.
+    required: false
+    default: "en"
+  default-language:
+    description: Language published at the site root; other languages are placed in subdirectories.
+    required: false
+    default: "en"
 
 runs:
   using: composite
@@ -40,11 +48,13 @@ runs:
         python -m pip install --upgrade pip
         python -m pip install -r "$REQUIREMENTS_FILE" --no-cache-dir
 
-    - name: Build HTML documentation
+    - name: Build localized HTML documentation
       shell: bash
       working-directory: ${{ inputs.docs-directory }}
       env:
         SOURCE_DIRECTORY: ${{ inputs.source-directory }}
         BUILD_DIRECTORY: ${{ inputs.build-directory }}
+        LANGUAGES: ${{ inputs.languages }}
+        DEFAULT_LANGUAGE: ${{ inputs.default-language }}
       run: |
-        python -m sphinx -M html "$SOURCE_DIRECTORY" "$BUILD_DIRECTORY"
+        bash "$GITHUB_ACTION_PATH/build.sh"
