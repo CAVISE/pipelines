@@ -1,0 +1,112 @@
+name: Python uv Quality
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Timeout applied to every quality job.
+        type: number
+        default: 15
+      python-version:
+        description: Python version selected by uv.
+        type: string
+        default: "3.12"
+      uv-version:
+        description: Exact uv version or setup-uv version selector.
+        type: string
+        default: latest-known
+      working-directory:
+        description: Directory containing pyproject.toml and uv.lock.
+        type: string
+        default: .
+      ruff-target:
+        description: Path checked and formatted by Ruff.
+        type: string
+        default: .
+      mypy-target:
+        description: Path checked by mypy.
+        type: string
+        default: src
+
+jobs:
+  lint:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python and uv
+        uses: CAVISE/pipelines/actions/setup-python-uv@main
+        with:
+          python-version: ${{ inputs.python-version }}
+          uv-version: ${{ inputs.uv-version }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Sync locked environment
+        working-directory: ${{ inputs.working-directory }}
+        run: uv sync --locked --all-extras --all-groups
+
+      - name: Run Ruff
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          RUFF_TARGET: ${{ inputs.ruff-target }}
+        run: uv run --locked ruff check -- "$RUFF_TARGET"
+
+  format:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python and uv
+        uses: CAVISE/pipelines/actions/setup-python-uv@main
+        with:
+          python-version: ${{ inputs.python-version }}
+          uv-version: ${{ inputs.uv-version }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Sync locked environment
+        working-directory: ${{ inputs.working-directory }}
+        run: uv sync --locked --all-extras --all-groups
+
+      - name: Check Ruff formatting
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          RUFF_TARGET: ${{ inputs.ruff-target }}
+        run: uv run --locked ruff format --check --diff -- "$RUFF_TARGET"
+
+  type-check:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python and uv
+        uses: CAVISE/pipelines/actions/setup-python-uv@main
+        with:
+          python-version: ${{ inputs.python-version }}
+          uv-version: ${{ inputs.uv-version }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Sync locked environment
+        working-directory: ${{ inputs.working-directory }}
+        run: uv sync --locked --all-extras --all-groups
+
+      - name: Run mypy
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          MYPY_TARGET: ${{ inputs.mypy-target }}
+        run: uv run --locked mypy -- "$MYPY_TARGET"

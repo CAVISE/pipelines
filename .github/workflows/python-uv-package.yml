@@ -1,0 +1,54 @@
+name: Python uv Package
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Package build timeout in minutes.
+        type: number
+        default: 15
+      python-version:
+        description: Python version selected by uv.
+        type: string
+        default: "3.12"
+      uv-version:
+        description: Exact uv version or setup-uv version selector.
+        type: string
+        default: latest-known
+      working-directory:
+        description: Directory containing the Python package.
+        type: string
+        default: .
+      import-module:
+        description: Python module imported from the built wheel.
+        type: string
+        required: true
+
+jobs:
+  package-build:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python and uv
+        uses: CAVISE/pipelines/actions/setup-python-uv@main
+        with:
+          python-version: ${{ inputs.python-version }}
+          uv-version: ${{ inputs.uv-version }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Verify lockfile
+        working-directory: ${{ inputs.working-directory }}
+        run: uv lock --check
+
+      - name: Build source and wheel distributions
+        working-directory: ${{ inputs.working-directory }}
+        run: uv build --clear
