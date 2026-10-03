@@ -1,0 +1,53 @@
+name: Python Black
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 10
+      python-version:
+        description: Python version passed to actions/setup-python.
+        type: string
+        default: "3.12"
+      black-version:
+        description: Version of Black installed from PyPI.
+        type: string
+        default: "26.5.1"
+      target-path:
+        description: Path checked by Black.
+        type: string
+        default: .
+
+jobs:
+  format-check:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: CAVISE/pipelines/actions/setup-python-pip@main
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install Black
+        shell: bash
+        env:
+          BLACK_VERSION: ${{ inputs.black-version }}
+        run: python -m pip install "black==$BLACK_VERSION"
+
+      - name: Check Python formatting
+        shell: bash
+        env:
+          TARGET_PATH: ${{ inputs.target-path }}
+        run: python -m black --check --diff "$TARGET_PATH"

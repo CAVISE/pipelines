@@ -1,0 +1,50 @@
+name: C++ Clang Format
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      container-image:
+        description: GHCR image containing the Meson and clang-format toolchain.
+        type: string
+        required: true
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 10
+      build-directory:
+        description: Meson build directory.
+        type: string
+        default: build
+
+jobs:
+  format-check:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ inputs.container-image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Configure Meson
+        shell: bash
+        env:
+          BUILD_DIRECTORY: ${{ inputs.build-directory }}
+        run: meson setup "$BUILD_DIRECTORY"
+
+      - name: Check C and C++ formatting with Meson
+        shell: bash
+        env:
+          BUILD_DIRECTORY: ${{ inputs.build-directory }}
+        run: meson compile -C "$BUILD_DIRECTORY" clang-format-check

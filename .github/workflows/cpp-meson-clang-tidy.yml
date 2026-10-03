@@ -1,0 +1,74 @@
+name: C++ Meson Clang Tidy
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub runner label.
+        type: string
+        default: ubuntu-latest
+      container-image:
+        description: GHCR image containing the Meson and clang-tidy toolchain.
+        type: string
+        required: true
+      timeout-minutes:
+        description: Job timeout in minutes.
+        type: number
+        default: 60
+      build-directory:
+        description: Meson build directory.
+        type: string
+        default: build
+      prepare-ns3:
+        description: Whether to run the ns3-configure and ns3-build Meson targets.
+        type: boolean
+        default: false
+
+jobs:
+  clang-tidy:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ inputs.container-image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Configure Meson
+        shell: bash
+        env:
+          BUILD_DIRECTORY: ${{ inputs.build-directory }}
+        run: meson setup "$BUILD_DIRECTORY"
+
+      - name: Configure ns-3
+        if: inputs.prepare-ns3
+        shell: bash
+        env:
+          BUILD_DIRECTORY: ${{ inputs.build-directory }}
+        run: meson compile -C "$BUILD_DIRECTORY" ns3-configure
+
+      - name: Build ns-3
+        if: inputs.prepare-ns3
+        shell: bash
+        env:
+          BUILD_DIRECTORY: ${{ inputs.build-directory }}
+        run: meson compile -C "$BUILD_DIRECTORY" ns3-build
+
+      - name: Build project
+        shell: bash
+        env:
+          BUILD_DIRECTORY: ${{ inputs.build-directory }}
+        run: meson compile -C "$BUILD_DIRECTORY"
+
+      - name: Run clang-tidy
+        shell: bash
+        env:
+          BUILD_DIRECTORY: ${{ inputs.build-directory }}
+        run: meson compile -C "$BUILD_DIRECTORY" clang-tidy
