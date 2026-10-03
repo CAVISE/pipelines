@@ -8,12 +8,20 @@ Reusable workflows accept only predefined typed inputs. They must not accept she
 
 ## Generic Python Workflows
 
+- `.github/workflows/python-black.yml` runs `black --check --diff` with a pinned Black version.
 - `.github/workflows/python-pytest.yml` runs pytest, optional protobuf generation, optional JUnit upload.
 - `.github/workflows/python-ruff.yml` runs `ruff check` and/or `ruff format --check --diff`.
 - `.github/workflows/python-mypy.yml` installs mypy tooling, optionally generates protobuf modules, and runs mypy.
 - `.github/workflows/python-cmake-cuda.yml` builds CMake CUDA extensions, validates the generated artifact manifest, and optionally imports installed Python modules.
 - `.github/workflows/python-deadcode.yml` installs and runs deadcode.
 - `.github/workflows/python-pre-commit.yml` runs pre-commit with a controlled `--all-files` flag and optional `SKIP` hook list.
+
+## Generic C++ Workflows
+
+- `.github/workflows/cpp-clang-format.yml` runs a Meson project's `clang-format-check` target inside a caller-provided GHCR image.
+- `.github/workflows/cpp-meson-clang-tidy.yml` builds a Meson project inside a caller-provided GHCR image, optionally prepares ns-3, and runs Meson's `clang-tidy` target.
+
+The caller must grant `packages: read` to `GITHUB_TOKEN`. The container image must provide Bash, Git, a C++ compiler, Meson, Ninja, the requested Clang tool, and the project's build dependencies.
 
 ## Composite Actions
 
