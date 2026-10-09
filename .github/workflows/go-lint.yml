@@ -1,0 +1,108 @@
+name: Go lint
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: "Explicit Go version. Overrides the version from go.mod when set."
+        type: string
+        default: ""
+      working-directory:
+        description: "Project directory, relative to the repository root."
+        type: string
+        default: "."
+      target:
+        description: "Package or package pattern passed to golangci-lint."
+        type: string
+        default: "./..."
+      config:
+        description: "golangci-lint configuration file, relative to working-directory."
+        type: string
+        default: ".golangci.yml"
+      tags:
+        description: "Build tags for linting. Empty preserves build tags from the configuration file."
+        type: string
+        default: ""
+      golangci-lint-version:
+        description: "Pinned golangci-lint version. Must support the selected Go version."
+        type: string
+        default: "v2.14.0"
+      cache:
+        description: "Cache Go modules, build outputs, and golangci-lint analysis."
+        type: boolean
+        default: true
+      cache-dependency-path:
+        description: "Dependency file paths or globs, relative to the repository root."
+        type: string
+        default: "go.*"
+      runs-on:
+        description: "Runner label for the Go lint job."
+        type: string
+        default: ubuntu-24.04
+      checkout-fetch-depth:
+        description: "Fetch depth passed to actions/checkout."
+        type: number
+        default: 1
+      timeout-minutes:
+        description: "Go lint job timeout in minutes."
+        type: number
+        default: 15
+      skip-dependabot:
+        description: "Skip checks triggered by dependabot[bot]."
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Go lint
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    if: ${{ !inputs.skip-dependabot || github.actor != 'dependabot[bot]' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      LINT_CONFIG: ${{ inputs.config }}
+      LINT_TARGET: ${{ inputs.target }}
+      LINT_TAGS: ${{ inputs.tags }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: ${{ inputs.checkout-fetch-depth }}
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.working-directory }}/go.mod
+          cache: ${{ inputs.cache }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ inputs.golangci-lint-version }}
+          working-directory: ${{ inputs.working-directory }}
+          install-only: true
+          skip-cache: ${{ !inputs.cache }}
+
+      - name: Validate lint configuration
+        run: golangci-lint config verify --config="$LINT_CONFIG"
+
+      - name: Check formatting
+        run: golangci-lint fmt --diff --config="$LINT_CONFIG" "$LINT_TARGET"
+
+      - name: Lint target
+        if: ${{ inputs.tags == '' }}
+        run: golangci-lint run --config="$LINT_CONFIG" "$LINT_TARGET"
+
+      - name: Lint target with tags
+        if: ${{ inputs.tags != '' }}
+        run: golangci-lint run --config="$LINT_CONFIG" --build-tags="$LINT_TAGS" "$LINT_TARGET"
