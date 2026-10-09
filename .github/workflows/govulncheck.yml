@@ -52,9 +52,9 @@ on:
         type: number
         default: 15
       skip-dependabot:
-        description: "Skip checks triggered by dependabot[bot]."
+        description: "Skip checks triggered by dependabot[bot]. Disabled by default so dependency updates are scanned."
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read

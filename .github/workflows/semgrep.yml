@@ -12,9 +12,9 @@ on:
         type: string
         default: "."
       extra-args:
-        description: "Additional Semgrep CLI arguments appended to the selected command."
+        description: 'Additional Semgrep CLI arguments as a JSON array of strings, e.g. ["--verbose", "--timeout", "60"].'
         type: string
-        default: ""
+        default: "[]"
       fail-on-findings:
         description: "Fail when findings are detected by adding --error."
         type: boolean
@@ -57,15 +57,33 @@ jobs:
           fetch-depth: ${{ inputs.checkout-fetch-depth }}
 
       - name: Run Semgrep scan
-        run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --volume "$PWD:/src:ro" \
-            --workdir /src \
-            --env HOME=/tmp \
-            "${{ inputs.semgrep-image }}" \
-            semgrep scan \
-              --config="${{ inputs.config }}" \
-              ${{ inputs.extra-args }} \
-              ${{ inputs.fail-on-findings && '--error' || '' }} \
-              "${{ inputs.target }}"
+        uses: actions/github-script@v9
+        env:
+          SEMGREP_IMAGE: ${{ inputs.semgrep-image }}
+          SEMGREP_CONFIG: ${{ inputs.config }}
+          SEMGREP_TARGET: ${{ inputs.target }}
+          SEMGREP_EXTRA_ARGS: ${{ inputs.extra-args }}
+          SEMGREP_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+        with:
+          script: |
+            const extraArgs = JSON.parse(process.env.SEMGREP_EXTRA_ARGS);
+            if (!Array.isArray(extraArgs) || !extraArgs.every(arg => typeof arg === 'string')) {
+              throw new Error('extra-args must be a JSON array of strings.');
+            }
+
+            const args = [
+              'run', '--rm',
+              '--user', `${process.getuid()}:${process.getgid()}`,
+              '--volume', `${process.env.GITHUB_WORKSPACE}:/src:ro`,
+              '--workdir', '/src',
+              '--env', 'HOME=/tmp',
+              '--', process.env.SEMGREP_IMAGE,
+              'semgrep', 'scan',
+              `--config=${process.env.SEMGREP_CONFIG}`,
+              ...extraArgs,
+            ];
+            if (process.env.SEMGREP_FAIL_ON_FINDINGS === 'true') {
+              args.push('--error');
+            }
+            args.push('--', process.env.SEMGREP_TARGET);
+            await exec.exec('docker', args);
