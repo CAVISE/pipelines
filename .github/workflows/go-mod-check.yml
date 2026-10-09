@@ -1,0 +1,69 @@
+name: Go modules
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: "Explicit Go version. Overrides the version from go.mod when set."
+        type: string
+        default: ""
+      working-directory:
+        description: "Project directory, relative to the repository root."
+        type: string
+        default: "."
+      cache:
+        description: "Cache Go modules and build outputs."
+        type: boolean
+        default: true
+      cache-dependency-path:
+        description: "Dependency file paths or globs, relative to the repository root."
+        type: string
+        default: "go.*"
+      runs-on:
+        description: "Runner label for the module checks."
+        type: string
+        default: ubuntu-24.04
+      timeout-minutes:
+        description: "Job timeout in minutes."
+        type: number
+        default: 15
+      skip-dependabot:
+        description: "Skip checks triggered by dependabot[bot]."
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  modules:
+    name: Go modules
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    if: ${{ !inputs.skip-dependabot || github.actor != 'dependabot[bot]' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      GOTOOLCHAIN: local
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.working-directory }}/go.mod
+          cache: ${{ inputs.cache }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+      - name: Verify module cache
+        run: go mod verify
+
+      - name: Check module tidiness
+        run: go mod tidy -diff

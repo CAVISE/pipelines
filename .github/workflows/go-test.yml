@@ -1,0 +1,102 @@
+name: Go tests
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: "Explicit Go version. Overrides the version from go.mod when set."
+        type: string
+        default: ""
+      working-directory:
+        description: "Project directory, relative to the repository root."
+        type: string
+        default: "."
+      target:
+        description: "Package or package pattern passed to go test."
+        type: string
+        default: "./..."
+      go-flags:
+        description: "Additional flags passed through GOFLAGS, such as -mod=readonly or -short."
+        type: string
+        default: ""
+      tags:
+        description: "Build tags passed to -tags. Takes precedence over tags in GOFLAGS."
+        type: string
+        default: ""
+      race:
+        description: "Enable the Go race detector. Requires CGO and a C compiler on the runner."
+        type: boolean
+        default: true
+      compile-only:
+        description: "Compile test binaries without executing tests or package initialization."
+        type: boolean
+        default: false
+      test-timeout:
+        description: "Timeout for each package's test binary, in Go duration format."
+        type: string
+        default: "5m"
+      cache:
+        description: "Cache Go modules and build outputs, not test results."
+        type: boolean
+        default: true
+      cache-dependency-path:
+        description: "Dependency file paths or globs, relative to the repository root."
+        type: string
+        default: "go.*"
+      runs-on:
+        description: "Runner label for the Go tests job."
+        type: string
+        default: ubuntu-24.04
+      checkout-fetch-depth:
+        description: "Fetch depth passed to actions/checkout."
+        type: number
+        default: 1
+      timeout-minutes:
+        description: "Go tests job timeout in minutes, including setup and compilation."
+        type: number
+        default: 15
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Go tests
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      TEST_TARGET: ${{ inputs.target }}
+      TEST_TAGS: ${{ inputs.tags }}
+      TEST_RACE: ${{ inputs.race }}
+      TEST_TIMEOUT: ${{ inputs.test-timeout }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: ${{ inputs.checkout-fetch-depth }}
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.working-directory }}/go.mod
+          cache: ${{ inputs.cache }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+      - name: Test target
+        if: ${{ !inputs.compile-only }}
+        env:
+          GOFLAGS: ${{ inputs.go-flags }}
+        run: go test -v -race="$TEST_RACE" -shuffle=on -count=1 -timeout="$TEST_TIMEOUT" -tags="$TEST_TAGS" "$TEST_TARGET"
+
+      - name: Compile tests
+        if: ${{ inputs.compile-only }}
+        env:
+          GOFLAGS: ${{ inputs.go-flags }}
+        run: go test -c -o "$RUNNER_TEMP/go-test-compile/" -race="$TEST_RACE" -tags="$TEST_TAGS" "$TEST_TARGET"

@@ -1,0 +1,101 @@
+name: Go vulnerabilities (govulncheck)
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: "Explicit Go version. Overrides the version from go.mod when set."
+        type: string
+        default: ""
+      working-directory:
+        description: "Project directory, relative to the repository root."
+        type: string
+        default: "."
+      target:
+        description: "Package or package pattern passed to govulncheck."
+        type: string
+        default: "./..."
+      govulncheck-version:
+        description: "Pinned govulncheck version. Must support the selected Go version."
+        type: string
+        default: "v1.8.0"
+      database:
+        description: "Go vulnerability database URL passed to -db."
+        type: string
+        default: "https://vuln.go.dev"
+      tags:
+        description: "Comma-separated build tags passed to govulncheck."
+        type: string
+        default: ""
+      tests:
+        description: "Include test code in vulnerability analysis. Does not execute tests."
+        type: boolean
+        default: true
+      cache:
+        description: "Cache Go modules and build outputs."
+        type: boolean
+        default: true
+      cache-dependency-path:
+        description: "Dependency file paths or globs, relative to the repository root."
+        type: string
+        default: "go.*"
+      runs-on:
+        description: "Runner label for the govulncheck job."
+        type: string
+        default: ubuntu-24.04
+      checkout-fetch-depth:
+        description: "Fetch depth passed to actions/checkout."
+        type: number
+        default: 1
+      timeout-minutes:
+        description: "govulncheck job timeout in minutes, including setup and installation."
+        type: number
+        default: 15
+      skip-dependabot:
+        description: "Skip checks triggered by dependabot[bot]. Disabled by default so dependency updates are scanned."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: govulncheck
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    if: ${{ !inputs.skip-dependabot || github.actor != 'dependabot[bot]' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      GOTOOLCHAIN: local
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: ${{ inputs.checkout-fetch-depth }}
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.working-directory }}/go.mod
+          cache: ${{ inputs.cache }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+      - name: Install govulncheck
+        env:
+          GOVULNCHECK_VERSION: ${{ inputs.govulncheck-version }}
+        run: go install "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION"
+
+      - name: Check Go vulnerabilities
+        env:
+          SCAN_DATABASE: ${{ inputs.database }}
+          SCAN_TARGET: ${{ inputs.target }}
+          SCAN_TAGS: ${{ inputs.tags }}
+          SCAN_TESTS: ${{ inputs.tests }}
+        run: govulncheck -format=text -db="$SCAN_DATABASE" -tags="$SCAN_TAGS" -test="$SCAN_TESTS" -- "$SCAN_TARGET"

@@ -1,0 +1,117 @@
+name: Go build
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: "Explicit Go version. Overrides the version from go.mod when set."
+        type: string
+        default: ""
+      working-directory:
+        description: "Project directory, relative to the repository root."
+        type: string
+        default: "."
+      target:
+        description: "Package or package pattern passed to go build."
+        type: string
+        default: "./..."
+      output:
+        description: "Build output path relative to working-directory. Required when upload-artifact is enabled."
+        type: string
+        default: ""
+      upload-artifact:
+        description: "Upload the build output as a downloadable GitHub Actions artifact."
+        type: boolean
+        default: false
+      artifact-name:
+        description: "Uploaded artifact name. Use a unique name for each build job in a workflow run."
+        type: string
+        default: go-build
+      artifact-retention-days:
+        description: "Artifact retention in days. Set to 0 to use the repository default."
+        type: number
+        default: 7
+      go-flags:
+        description: "Additional build flags passed through GOFLAGS, such as -trimpath or -mod=readonly."
+        type: string
+        default: ""
+      tags:
+        description: "Build tags passed to -tags. Takes precedence over tags in GOFLAGS."
+        type: string
+        default: ""
+      ldflags:
+        description: "Linker flags passed to -ldflags. Takes precedence over linker flags in GOFLAGS."
+        type: string
+        default: ""
+      cache:
+        description: "Cache Go modules and build outputs."
+        type: boolean
+        default: true
+      cache-dependency-path:
+        description: "Dependency file paths or globs, relative to the repository root."
+        type: string
+        default: "go.*"
+      runs-on:
+        description: "Runner label for the Go build job."
+        type: string
+        default: ubuntu-24.04
+      checkout-fetch-depth:
+        description: "Fetch depth passed to actions/checkout."
+        type: number
+        default: 1
+      timeout-minutes:
+        description: "Go build job timeout in minutes."
+        type: number
+        default: 15
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Go build
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: ${{ inputs.checkout-fetch-depth }}
+          persist-credentials: false
+
+      - name: Require output for artifact upload
+        if: ${{ inputs.upload-artifact && inputs.output == '' }}
+        run: |
+          echo "::error::Set the output input when upload-artifact is enabled."
+          exit 1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.working-directory }}/go.mod
+          cache: ${{ inputs.cache }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+      - name: Build target
+        env:
+          GOFLAGS: ${{ inputs.go-flags }}
+          BUILD_TARGET: ${{ inputs.target }}
+          BUILD_OUTPUT: ${{ inputs.output }}
+          BUILD_TAGS: ${{ inputs.tags }}
+          BUILD_LDFLAGS: ${{ inputs.ldflags }}
+        run: go build -o="$BUILD_OUTPUT" -tags="$BUILD_TAGS" -ldflags="$BUILD_LDFLAGS" "$BUILD_TARGET"
+
+      - name: Upload build artifact
+        if: ${{ inputs.upload-artifact }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.working-directory }}/${{ inputs.output }}
+          retention-days: ${{ inputs.artifact-retention-days }}
+          if-no-files-found: error

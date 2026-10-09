@@ -1,0 +1,108 @@
+name: Go security (gosec)
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: "Explicit Go version. Overrides the version from go.mod when set."
+        type: string
+        default: ""
+      working-directory:
+        description: "Project directory, relative to the repository root."
+        type: string
+        default: "."
+      target:
+        description: "Package or package pattern passed to gosec."
+        type: string
+        default: "./..."
+      gosec-version:
+        description: "Pinned gosec version. Must support the selected Go version."
+        type: string
+        default: "v2.29.0"
+      config:
+        description: "Optional gosec JSON configuration file, relative to working-directory."
+        type: string
+        default: ""
+      exclude-dir:
+        description: "Additional directory name or regex excluded by gosec. Built-in exclusions remain."
+        type: string
+        default: "vendor"
+      tags:
+        description: "Comma-separated build tags passed to gosec."
+        type: string
+        default: ""
+      tests:
+        description: "Include test files in static analysis. Does not execute tests."
+        type: boolean
+        default: true
+      cache:
+        description: "Cache Go modules and build outputs."
+        type: boolean
+        default: true
+      cache-dependency-path:
+        description: "Dependency file paths or globs, relative to the repository root."
+        type: string
+        default: "go.*"
+      runs-on:
+        description: "Runner label for the gosec job."
+        type: string
+        default: ubuntu-24.04
+      checkout-fetch-depth:
+        description: "Fetch depth passed to actions/checkout."
+        type: number
+        default: 1
+      timeout-minutes:
+        description: "gosec job timeout in minutes, including setup and installation."
+        type: number
+        default: 15
+      skip-dependabot:
+        description: "Skip checks triggered by dependabot[bot]."
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  gosec:
+    name: gosec
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    if: ${{ !inputs.skip-dependabot || github.actor != 'dependabot[bot]' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      GOTOOLCHAIN: local
+      SCAN_CONFIG: ${{ inputs.config }}
+      SCAN_EXCLUDE_DIR: ${{ inputs.exclude-dir }}
+      SCAN_TARGET: ${{ inputs.target }}
+      SCAN_TAGS: ${{ inputs.tags }}
+      SCAN_TESTS: ${{ inputs.tests }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: ${{ inputs.checkout-fetch-depth }}
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.working-directory }}/go.mod
+          cache: ${{ inputs.cache }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+      - name: Install gosec
+        env:
+          GOSEC_VERSION: ${{ inputs.gosec-version }}
+        run: go install "github.com/securego/gosec/v2/cmd/gosec@$GOSEC_VERSION"
+
+      - name: Validate target packages
+        run: go list -tags="$SCAN_TAGS" -test="$SCAN_TESTS" -- "$SCAN_TARGET"
+
+      - name: Scan Go code
+        run: gosec -fmt=golint -conf="$SCAN_CONFIG" -exclude-dir="$SCAN_EXCLUDE_DIR" -tags="$SCAN_TAGS" -tests="$SCAN_TESTS" -- "$SCAN_TARGET"
