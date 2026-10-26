@@ -77,7 +77,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            ca-certificates=20260601~24.04.* \
+            ca-certificates=20260816ubuntu0.24.04.* \
             python3=3.12.* \
             python3-dev=3.12.* \
             python3-venv=3.12.*
