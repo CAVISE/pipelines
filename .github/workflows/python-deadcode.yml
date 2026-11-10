@@ -38,20 +38,10 @@ jobs:
 
       - name: Install dependencies
         shell: bash
-        run: python -m pip install deadcode
+        run: python -m pip install deadcode==2.6.0
 
       - name: Run deadcode
         shell: bash
         env:
           DEADCODE_TARGET_PATH: ${{ inputs.target-path }}
-        run: |
-          python - <<'PY'
-          import os
-          import sys
-          from deadcode.cli import main
-
-          result = main([os.environ["DEADCODE_TARGET_PATH"]])
-          if result is not None:
-              print(result)
-              sys.exit(1)
-          PY
+        run: deadcode "$DEADCODE_TARGET_PATH"
